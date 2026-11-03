@@ -1,4 +1,5 @@
 services:
+  # מסד הנתונים; רק backend מדבר איתו
   postgres:
     image: postgres:15-alpine
     environment:
