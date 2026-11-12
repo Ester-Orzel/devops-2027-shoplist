@@ -1,32 +1,50 @@
-# stats-deployment.yml - your turn (step 9a). Same pattern as backend-deployment.yml
-# stats has no Secret: it only talks to the backend
+# postgres-deployment.yml - keeps one postgres pod running
+# Uses three other files by name: the Secret, the ConfigMap and the PVC
 apiVersion: apps/v1
-kind: ____
+kind: Deployment                         # which resource keeps pods running?
 metadata:
-  name: ____
+  name: postgres
   namespace: shoplist
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: ____
+      app: postgres                     # the label this Deployment looks for
   template:
     metadata:
       labels:
-        app: ____                # exactly the same label as above
+        app: postgres                   # the label it puts on its pods. Must match the line above
     spec:
       containers:
-        - name: stats
-          image: ____
-          imagePullPolicy: Never
-          env:
-            - name: BACKEND_URL
-              value: ____        # backend Service name, with http:// and port
+        - name: postgres
+          image: postgres:15-alpine             # same image as in Compose: version 15, alpine
+          envFrom:
+            - secretRef:
+                name: postgres-secret          # name of the Secret (postgres-secret.yml)
           ports:
-            - containerPort: ____
+            - containerPort: 5432   # postgres port
           readinessProbe:
-            httpGet:
-              path: /health
-              port: ____
+            exec:
+              command: ["pg_isready", "-U", "shopuser", "-d", "shoplist"]   # user and database from the Secret, plain text
             initialDelaySeconds: 5
             periodSeconds: 10
+          volumeMounts:
+            - name: postgres-data          # must match the storage volume name below
+              mountPath: /var/lib/postgresql/data
+            - name: postgres-init             # must match the init.sql volume name below
+              mountPath: /docker-entrypoint-initdb.d
+          resources:
+            limits:
+              cpu: "0.5"
+              memory: 32Gi
+            requests:
+              cpu: "0.1"
+              memory: 1Gi
+            
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-pvc         # name of the PVC (postgres-pvc.yml)
+        - name: postgres-init
+          configMap:
+            name: postgres-init             # name of the ConfigMap (postgres-configmap.yml)
